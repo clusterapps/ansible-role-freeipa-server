@@ -1,0 +1,120 @@
+---
+- name: Clean up yum
+  command: "yum clean all"
+  changed_when: false
+- name: Remove Chrony
+  package:
+    name: chrony
+    state: absent
+
+- name: Run yum updates
+  yum:
+    name: '*'
+    state: latest
+  when:  ansible_distribution == "RedHat" or "CentOS"  
+  register: updated
+
+- name: Reboot immediately if system was updated.
+  shell: "sleep 5 && reboot"
+  async: 1
+  poll: 0
+  when: updated.changed 
+
+- name: Wait for the reboot to complete 
+  wait_for_connection:
+    connect_timeout: 20
+    sleep: 5
+    delay: 5
+    timeout: 300
+  when: updated.changed
+
+- name: Install NTP
+  package:
+    name: ntp
+    state: present
+
+- name: Start ntp
+  service:
+    name: ntpd
+    state: started
+    enabled: true    
+- name: FreeIPA ports
+  firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled 
+    immediate: true   
+  with_items:
+    - freeipa-ldap 
+    - freeipa-ldaps 
+    - freeipa-replication 
+    - freeipa-trust  
+    - ntp
+- name: Reload Firewall
+  service:
+    name: firewalld
+    state: restarted   
+  changed_when: false  
+      
+# - name: Update /etc/hosts from inventory
+#   lineinfile: dest=/etc/hosts line="{{ hostvars[item]['ansible_host'] }} {{ hostvars[item]['ansible_hostname'] }}"
+#   with_items: '{{groups.freeipa}}'
+#   tags:
+#     - hosts
+
+- name: Clear YUM Cache
+  command: "yum clean all"
+  changed_when: false
+
+- name: Checking for required packages
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ ipaserver_packages }}"
+  when: ansible_distribution == "CentOS"  
+
+- name: Run the Primary System
+  action: command
+    {{ ipaserver_base_command }}
+    --realm {{ ipaserver_realm }}
+    --domain {{ ipaserver_domain }}
+    -a {{ ipaserver_admin_password }}
+    -p {{ ipaserver_dir_admin_password }}
+    --hostname={{ inventory_hostname }}
+    --ip-address={{ ansible_host }}
+    {{ '--idstart=%s' % ipaserver_idstart if ipaserver_idstart | default(False) else '' }}
+    {{ '--idmax=%s' % ipaserver_idmax if ipaserver_idmax | default(False) else '' }}
+    {{ '--forwarder=%s' % ipaserver_dns_forwarder
+       if ipaserver_dns_forwarder | default(False) else '--no-forwarders' }}
+    {{ '--mkhomedir' if ipaserver_mkhomedir | default(True) else '' }}
+    {{ '--setup-dns' if ipaserver_setup_dns | default(True) else '' }}
+    {{ '--ssh-trust-dns' if ipaserver_ssh_trust_dns | default(True) else '' }}
+    {{ '' if ipaserver_hbac_allow | default(True) else '--no_hbac_allow' }}
+    {{ '' if ipaserver_setup_ntp | default(True) else '--no-ntp' }}
+    {{ '' if ipaserver_configure_ssh | default(True) else '--no-ssh' }}
+    {{ '' if ipaserver_configure_sshd | default(True) else '--no-sshd' }}
+    {{ '' if ipaserver_ui_redirect | default(True) else '--no-ui-redirect' }}
+    creates=/etc/ipa/default.conf
+  when: ipaserver_primary == true
+  tags: primary
+
+# - name: Add AD Settings
+#   ipa-adtrust-install --netbios-name=ipa_netbios -a {{ ipaserver_admin_password }}  
+#   ipa trust-add --type=ad ad_domain --admin i{{ paserver_ads_user }} --password {[ ipaserver_ads_password ]} {{ '--two-way=true' if ipaserver_ads_trust | default(True) else '' }}
+
+#   when: ipaserver_primary == true and ipaserver_ads_trust == true 
+#   tags: adtrust
+
+- name: Add Replica Systems
+  when: ipaserver_primary != true
+  action: command 
+    {{ ipaserver_replica_command }}
+    --admin-password={{ ipaserver_admin_password }}
+    --password={{ ipaserver_dir_admin_password }}
+    --setup-dns --mkhomedir
+    {{ '--ssh-trust-dns' if ipaserver_ssh_trust_dns | default(True) else '' }}
+    {{ '--forwarder=%s' % ipaserver_dns_forwarder
+       if ipaserver_dns_forwarder | default(False) else '--no-forwarders' }}
+    creates=/etc/dirsrv/ds.keytab
+  tags:
+    - replicas  

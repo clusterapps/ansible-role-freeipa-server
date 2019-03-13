@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: Michael Cleary
+  description: Deploy FreeIPA Identity Management Servers
+  license: GPLv2
+  min_ansible_version: 1.2
+  platforms:
+  - name: EL
+    versions:
+    - 7
+  - name: CentOS
+    versions:
+    - 7
+  categories:
+  - system
+dependencies: []
