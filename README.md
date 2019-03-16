@@ -6,7 +6,7 @@ A parameterized role for setting up a FreeIPA server as a primary or replica. Pr
 Requirements
 ------------
 
-Should work on any Red Hat 7.5 clone.
+Should work on any Red Hat 7.4+ clone.
 
 Role Variables
 --------------
@@ -54,6 +54,6 @@ GPLv2
 
 Author Information
 ------------------
-Michael Cleary <mcleary@bluepacllc.com>
+Michael Cleary <mcleary@clusterapps.com>
 
 Forked from https://github.com/gregswift/ansible-freeipa to add replica servers and more functionality. 
