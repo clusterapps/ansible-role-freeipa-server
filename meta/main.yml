@@ -1,5 +1,6 @@
 ---
 galaxy_info:
+  role_name: freeipa-server
   author: Michael Cleary
   description: Deploy FreeIPA Identity Management Servers
   license: GPLv2
