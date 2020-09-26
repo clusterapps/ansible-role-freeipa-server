@@ -1,0 +1,7 @@
+ipaserver_packages:
+  - "@idm:DL1"
+  - ipa-server 
+  - ipa-server-dns 
+  - ipa-server-trust-ad
+  - bind
+  - bind-dyndb-ldap

@@ -1,14 +1,22 @@
 ---
+- name: Gather variables for each operating system
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_distribution }}.yml"
+    - "{{ ansible_os_family }}.yml"
+
+- name: Set a hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+
 - name: Clean up yum
   command: "yum clean all"
   changed_when: false
-- name: Remove Chrony
-  package:
-    name: chrony
-    state: absent
 
-- name: Run yum updates
-  yum:
+- name: Check for updates
+  package:
     name: '*'
     state: latest
   when:  ansible_distribution == "RedHat" or "CentOS"  
@@ -28,16 +36,7 @@
     timeout: 300
   when: updated.changed
 
-- name: Install NTP
-  package:
-    name: ntp
-    state: present
-
-- name: Start ntp
-  service:
-    name: ntpd
-    state: started
-    enabled: true    
+  
 - name: FreeIPA ports
   firewalld:
     service: "{{ item }}"
@@ -45,11 +44,18 @@
     state: enabled 
     immediate: true   
   with_items:
+    - https
+    - http
+    - ldaps
+    - kerberos
+    - kpasswd
+    - dns
+    - ntp
     - freeipa-ldap 
     - freeipa-ldaps 
     - freeipa-replication 
-    - freeipa-trust  
-    - ntp
+    - freeipa-trust
+
 - name: Reload Firewall
   service:
     name: firewalld
@@ -57,10 +63,13 @@
   changed_when: false  
       
 # - name: Update /etc/hosts from inventory
-#   lineinfile: dest=/etc/hosts line="{{ hostvars[item]['ansible_host'] }} {{ hostvars[item]['ansible_hostname'] }}"
+#   lineinfile: 
+#     dest: /etc/hosts 
+#     line: "{{ hostvars[item]['ansible_host'] }} {{ ansible_hostname }}.{{ ansible_domain }} {{ ansible_hostname }}"
 #   with_items: '{{groups.freeipa}}'
 #   tags:
 #     - hosts
+
 
 - name: Clear YUM Cache
   command: "yum clean all"
@@ -101,16 +110,14 @@
 # - name: Add AD Settings
 #   ipa-adtrust-install --netbios-name=ipa_netbios -a {{ ipaserver_admin_password }}  
 #   ipa trust-add --type=ad ad_domain --admin i{{ paserver_ads_user }} --password {[ ipaserver_ads_password ]} {{ '--two-way=true' if ipaserver_ads_trust | default(True) else '' }}
-
 #   when: ipaserver_primary == true and ipaserver_ads_trust == true 
 #   tags: adtrust
 
 - name: Add Replica Systems
-  when: ipaserver_primary != true
+  when: ipaserver_replica == true
   action: command 
     {{ ipaserver_replica_command }}
     --admin-password={{ ipaserver_admin_password }}
-    --password={{ ipaserver_dir_admin_password }}
     --setup-dns --mkhomedir
     {{ '--ssh-trust-dns' if ipaserver_ssh_trust_dns | default(True) else '' }}
     {{ '--forwarder=%s' % ipaserver_dns_forwarder

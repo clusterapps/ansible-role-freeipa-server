@@ -1,7 +1,7 @@
 ipaserver
 =========
 
-A parameterized role for setting up a FreeIPA server as a primary or replica. Primarily tested on CentOS 7.
+A parameterized role for setting up a FreeIPA server as a primary or replica. Primarily tested on CentOS 7 and CentOS 8.
 
 Requirements
 ------------
@@ -45,7 +45,7 @@ Here is an example playbook that can readily wrap this role and still be fairly 
           private: yes
           default: "{{ vault_ipaserver_dir_admin_password }}"
       roles:
-         - { role: gregswift.ipaserver }
+         - { role: clusterapps.freeipa-server }
 
 License
 -------
